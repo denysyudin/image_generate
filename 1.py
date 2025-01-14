@@ -15,6 +15,10 @@ class CustomDataset(Dataset):
         with open(captions_file, 'r') as file:
             self.captions = file.readlines()
         self.image_files = [f for f in os.listdir(images_dir) if f.endswith(('.jpg', '.png'))]
+        
+        # Debug prints
+        print(f"Found {len(self.image_files)} images.")
+        print(f"Found {len(self.captions)} captions.")
 
     def __len__(self):
         return len(self.image_files)
