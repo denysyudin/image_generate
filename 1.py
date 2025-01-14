@@ -6,6 +6,10 @@ from transformers import AdamW
 from diffusers import StableDiffusionPipeline
 import torch
 from tqdm import tqdm
+from huggingface_hub import login
+
+# Authenticate with Hugging Face
+login(token="your_huggingface_token")
 
 # Dataset class
 class CustomDataset(Dataset):
@@ -43,7 +47,7 @@ dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data
 dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 # Load model
-stable_diffusion = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v3-5-large", torch_dtype=torch.float16)
+stable_diffusion = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-v3-5-large", torch_dtype=torch.float16)
 stable_diffusion = stable_diffusion.to("cuda")
 
 # Optimizer
