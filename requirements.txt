@@ -7,3 +7,5 @@ accelerate
 pillow
 git+https://github.com/huggingface/diffusers.git
 git+https://github.com/huggingface/transformers.git
+huggingface_hub
+python-dotenv

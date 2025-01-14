@@ -7,9 +7,12 @@ from diffusers import StableDiffusionPipeline
 import torch
 from tqdm import tqdm
 from huggingface_hub import login
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Authenticate with Hugging Face
-login(token="your_huggingface_token")
+login(token=os.getenv("TOKEN"))
 
 # Dataset class
 class CustomDataset(Dataset):
