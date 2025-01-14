@@ -50,7 +50,7 @@ dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data
 dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 # Load model
-stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-large")
+stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
 stable_diffusion = stable_diffusion.to("cuda")
 
 # Optimizer
@@ -75,7 +75,7 @@ model_save_path = './trained_pebble_diffusion_3.5_model'
 torch.save(stable_diffusion.state_dict(), model_save_path)
 
 # Load trained model for inference
-trained_model = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-large")
+trained_model = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
 trained_model.load_state_dict(torch.load(model_save_path))
 trained_model.eval().to("cuda")
 
