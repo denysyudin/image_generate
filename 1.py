@@ -39,7 +39,7 @@ transform = transforms.Compose([
 ])
 
 # DataLoader
-dataset = CustomDataset(images_dir='./data/images', captions_file='./data/captions/pebble.txt', transform=transform)
+dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data/captions/pebble.txt', transform=transform)
 dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 # Load model
