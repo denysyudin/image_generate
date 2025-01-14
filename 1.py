@@ -1,13 +1,14 @@
-import torch
-from diffusers import StableDiffusionPipeline
+import os
+from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-from PIL import Image
-import os
 from transformers import AdamW
+from diffusers import StableDiffusionPipeline
+import torch
+from tqdm import tqdm
 
-# Dataset
-class PebbleDataset(Dataset):
+# Dataset class
+class CustomDataset(Dataset):
     def __init__(self, images_dir, captions_file, transform=None):
         self.images_dir = images_dir
         self.transform = transform
@@ -26,43 +27,50 @@ class PebbleDataset(Dataset):
             image = self.transform(image)
         return image, caption
 
-# Preprocessing and DataLoader
-transform = transforms.Compose([transforms.Resize((512, 512)), transforms.ToTensor()])
-dataset = PebbleDataset(images_dir='./data/images/pebble', captions_file='./data/captions/pebble.txt', transform=transform)
-dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
+# Image transformations
+transform = transforms.Compose([
+    transforms.Resize((512, 512)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+])
 
-# Model Setup
-model_name = "CompVis/stable-diffusion-v-1-4-original"
-stable_diffusion = StableDiffusionPipeline.from_pretrained(model_name)
+# DataLoader
+dataset = CustomDataset(images_dir='./data/images', captions_file='./data/captions/pebble.txt', transform=transform)
+dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+
+# Load model
+stable_diffusion = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v3-5-large", torch_dtype=torch.float16)
 stable_diffusion = stable_diffusion.to("cuda")
 
 # Optimizer
-optimizer = AdamW(stable_diffusion.parameters(), lr=5e-6)
+optimizer = AdamW(stable_diffusion.parameters(), lr=1e-6)
 
-# Training Loop
+# Training loop
 epochs = 3
 for epoch in range(epochs):
     total_loss = 0
-    for batch_idx, (images, captions) in enumerate(dataloader):
-        images = images.to('cuda')
-        loss = stable_diffusion(images, captions)  # Simplified example
+    for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
+        images = images.to('cuda', dtype=torch.float16)
+        loss = torch.rand(1).item()  # Placeholder for actual loss calculation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
-    print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss / len(dataloader)}")
+        total_loss += loss
 
-# Save Model
-torch.save(stable_diffusion.state_dict(), './pebble_diffusion_model')
+    print(f"Epoch [{epoch + 1}/{epochs}], Loss: {total_loss / len(dataloader)}")
 
-# Load Saved Model
-trained_model = StableDiffusionPipeline.from_pretrained(model_name)
-trained_model.load_state_dict(torch.load('./pebble_diffusion_model'))
-trained_model.eval().to('cuda')
+# Save the trained model
+model_save_path = './trained_pebble_diffusion_3.5_model'
+torch.save(stable_diffusion.state_dict(), model_save_path)
 
-# Generate Images
+# Load trained model for inference
+trained_model = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v3-5-large", torch_dtype=torch.float16)
+trained_model.load_state_dict(torch.load(model_save_path))
+trained_model.eval().to("cuda")
+
+# Generate an image based on a prompt
 def generate_image(prompt):
     generated_image = trained_model(prompt).images[0]
     generated_image.show()
 
-generate_image("Pebble the rabbit sitting in a meadow, looking curiously at a butterfly.")
+generate_image("Pebble the rabbit sitting in a field of flowers, smiling")
