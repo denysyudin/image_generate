@@ -3,7 +3,7 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from transformers import AdamW
-from diffusers import StableDiffusionPipeline
+from diffusers import DiffusionPipeline
 import torch
 from tqdm import tqdm
 from huggingface_hub import login
@@ -50,7 +50,7 @@ dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data
 dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 # Load model
-stable_diffusion = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-v3-5-large", torch_dtype=torch.float16)
+stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-large")
 stable_diffusion = stable_diffusion.to("cuda")
 
 # Optimizer
@@ -75,7 +75,7 @@ model_save_path = './trained_pebble_diffusion_3.5_model'
 torch.save(stable_diffusion.state_dict(), model_save_path)
 
 # Load trained model for inference
-trained_model = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v3-5-large", torch_dtype=torch.float16)
+trained_model = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-large")
 trained_model.load_state_dict(torch.load(model_save_path))
 trained_model.eval().to("cuda")
 
