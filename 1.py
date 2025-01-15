@@ -98,9 +98,12 @@ for epoch in range(epochs):
 
         outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
         
+        # Extract the tensor from the UNet2DConditionOutput
+        output_tensor = outputs.sample  # Assuming 'sample' is the attribute containing the tensor
+
         # Compute loss (replace with actual target)
-        target = torch.rand_like(outputs)  # Placeholder target, replace with actual target
-        loss = criterion(outputs, target)
+        target = torch.rand_like(output_tensor)  # Placeholder target, replace with actual target
+        loss = criterion(output_tensor, target)
         
         optimizer.zero_grad()
         loss.backward()
