@@ -9,6 +9,7 @@ from tqdm import tqdm
 from huggingface_hub import login
 from dotenv import load_dotenv
 from torch.optim import AdamW
+import torch.nn as nn
 
 load_dotenv()
 
@@ -63,15 +64,24 @@ optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 
 # Training loop
 epochs = 3
+criterion = nn.MSELoss()  # Example loss function, replace with appropriate one
+
 for epoch in range(epochs):
     total_loss = 0
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
         images = images.to('cuda', dtype=torch.float16)
-        loss = torch.rand(1).item()  # Placeholder for actual loss calculation
+        
+        # Forward pass (replace with actual model forward pass)
+        outputs = unet_model(images)  # Example, replace with actual model call
+        
+        # Compute loss (replace with actual target)
+        target = torch.rand_like(outputs)  # Placeholder target, replace with actual target
+        loss = criterion(outputs, target)
+        
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        total_loss += loss
+        total_loss += loss.item()
 
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {total_loss / len(dataloader)}")
 
