@@ -127,8 +127,12 @@ for epoch in range(epochs):
                     time_ids = time_ids.repeat(1, repeat_factor + (1 if remainder > 0 else 0), 1)
                     time_ids = time_ids[:, :text_embeds.size(1), :]  # Trim to match exactly
 
+                # Ensure both tensors are 3D
+                if text_embeds.dim() == 2:
+                    text_embeds = text_embeds.unsqueeze(-1)
+
                 # Now expand time_ids to match the dimensions of text_embeds
-                time_embeds = time_ids.expand(-1, text_embeds.size(1), -1)
+                time_embeds = time_ids.expand(-1, text_embeds.size(1), text_embeds.size(2))
 
                 # Ensure added_cond_kwargs is passed correctly
                 added_cond_kwargs = {'text_embeds': text_embeds, 'time_ids': time_embeds}
