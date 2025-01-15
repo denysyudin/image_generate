@@ -66,7 +66,7 @@ dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 # Load model
 torch.cuda.empty_cache()
-stable_diffusion = DiffusionPipeline.from_pretrained("stable-diffusion-v1-5/stable-diffusion-v1-5", torch_dtype=torch.float16)
+stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16)
 stable_diffusion = stable_diffusion.to("cuda")
 
 # Assuming 'stable_diffusion' is your pipeline object
