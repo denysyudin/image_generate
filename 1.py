@@ -76,7 +76,7 @@ unet_model = stable_diffusion.unet  # Access the UNet model within the pipeline
 optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 
 # Initialize GradScaler for mixed precision
-scaler = GradScaler(device='cuda')
+scaler = GradScaler()
 
 # Training loop
 epochs = 3
@@ -105,7 +105,7 @@ for epoch in range(epochs):
         # Ensure time_embeds has the same number of dimensions as text_embeds
         time_embeds = time_ids.unsqueeze(1).unsqueeze(2).expand(-1, text_embeds.size(1), text_embeds.size(2))
 
-        with autocast(device_type='cuda'):
+        with autocast(dtype=torch.float16):
             def custom_forward(*inputs, **kwargs):
                 # Ensure added_cond_kwargs is passed
                 return unet_model(*inputs, added_cond_kwargs=kwargs)
@@ -115,7 +115,6 @@ for epoch in range(epochs):
                 images, 
                 timesteps, 
                 encoder_hidden_states, 
-                use_reentrant=False, 
                 text_embeds=text_embeds,  # Pass the placeholder text_embeds here
                 time_ids=time_ids
             )
@@ -148,7 +147,7 @@ trained_model.eval().to("cuda")
 # Generate an image based on a prompt
 def generate_image(prompt):
     with torch.no_grad():  # Disable gradient calculation
-        generated_image = trained_model(prompt).images[0]
+        generated_image = trained_model(prompt=prompt).images[0]
         generated_image.show()
 
 generate_image("Pebble the rabbit sitting in a field of flowers, smiling")
