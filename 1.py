@@ -1,14 +1,18 @@
 import os
+# Set environment variables before importing torch
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-from transformers import AdamW
+# Correct AdamW import
+from torch.optim import AdamW
 from diffusers import DiffusionPipeline
 import torch
 from tqdm import tqdm
-from huggingface_hub import login
+# Correct login import
+from huggingface_hub import login, HfApi
 from dotenv import load_dotenv
-from torch.optim import AdamW
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from torch.amp import autocast, GradScaler
@@ -16,9 +20,9 @@ from torch.amp import autocast, GradScaler
 load_dotenv()
 
 # Authenticate with Hugging Face
-login(token=os.getenv("TOKEN"))
-
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+api = HfApi(token=os.getenv("TOKEN"))
+api.token = os.getenv("TOKEN")
+login(token=api.token)
 
 # Dataset class
 class CustomDataset(Dataset):
@@ -48,16 +52,18 @@ class CustomDataset(Dataset):
 # Custom transform to add an extra channel
 class AddChannel:
     def __call__(self, image):
-        # Add an extra channel (e.g., all zeros)
-        extra_channel = torch.zeros((1, image.size(1), image.size(2)))
-        return torch.cat((image, extra_channel), dim=0)
+        if isinstance(image, torch.Tensor):
+            extra_channel = torch.zeros((1, image.size(1), image.size(2)))
+            return torch.cat((image, extra_channel), dim=0)
+        else:
+            raise TypeError("Input image must be a tensor")
 
 # Image transformations
 transform = transforms.Compose([
     transforms.Resize((256, 256)),
-    transforms.ToTensor(),
-    AddChannel(),  # Add the extra channel here
-    transforms.Normalize(mean=[0.5, 0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5, 0.5]),
+    transforms.ToTensor(),  # Convert to tensor first
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    AddChannel(),  # Add the extra channel after ToTensor
 ])
 
 # DataLoader
@@ -85,8 +91,8 @@ accumulation_steps = 10  # Example accumulation steps, replace with appropriate 
 
 for epoch in range(epochs):
     total_loss = 0
-    optimizer.zero_grad()  # Move zero_grad outside the loop
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
+        optimizer.zero_grad()  # Move zero_grad here for gradient accumulation
         images = images.to('cuda', dtype=torch.float16)
         images.requires_grad_(True)
 
@@ -94,31 +100,32 @@ for epoch in range(epochs):
         torch.cuda.empty_cache()
 
         timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
+        
+        # Placeholder for encoder_hidden_states
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
 
-        # Generate time_ids based on your specific requirements
-        time_ids = torch.randint(0, 1000, (images.size(0),), device=images.device)
+        # Generate time_ids 
+        time_ids = torch.randint(0, 1000, (images.size(0), 6), device=images.device, dtype=torch.float16)
 
         # Placeholder for text_embeds
         text_embeds = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
 
-        # Ensure time_embeds has the same number of dimensions as text_embeds
-        time_embeds = time_ids.unsqueeze(1).unsqueeze(2).expand(-1, text_embeds.size(1), text_embeds.size(2))
-
         with autocast(device_type='cuda', dtype=torch.float16):
-            def custom_forward(*inputs, **kwargs):
-                # Ensure added_cond_kwargs is passed
-                return unet_model(*inputs, added_cond_kwargs=kwargs)
+            # custom_forward now only deals with tensors
+            def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
+                # Ensure added_cond_kwargs is passed correctly
+                added_cond_kwargs = {'text_embeds': text_embeds, 'time_ids': time_ids}
+                return unet_model(images, timesteps, encoder_hidden_states, added_cond_kwargs=added_cond_kwargs).sample
 
-            outputs = checkpoint.checkpoint(
-                custom_forward, 
-                images, 
-                timesteps, 
-                encoder_hidden_states, 
-                text_embeds=text_embeds,  # Pass the placeholder text_embeds here
-                time_ids=time_ids
+            output_tensor = checkpoint.checkpoint(
+                custom_forward,
+                images,
+                timesteps,
+                encoder_hidden_states,
+                text_embeds,  # Pass the placeholder text_embeds here
+                time_ids
             )
-            output_tensor = outputs.sample
+
             target = torch.rand_like(output_tensor)
             loss = criterion(output_tensor, target) / accumulation_steps
 
@@ -127,7 +134,7 @@ for epoch in range(epochs):
         if (batch_idx + 1) % accumulation_steps == 0:
             scaler.step(optimizer)
             scaler.update()
-            optimizer.zero_grad()
+            # optimizer.zero_grad() # Removed zero_grad here
 
         total_loss += loss.item() * accumulation_steps
 
