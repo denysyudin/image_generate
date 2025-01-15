@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from torch.optim import AdamW
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
+from torch.cuda.amp import autocast, GradScaler
 
 load_dotenv()
 
@@ -73,6 +74,9 @@ unet_model = stable_diffusion.unet  # Access the UNet model within the pipeline
 # Create an optimizer for the UNet model
 optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 
+# Initialize GradScaler for mixed precision
+scaler = GradScaler()
+
 # Training loop
 epochs = 3
 criterion = nn.MSELoss()  # Example loss function, replace with appropriate one
@@ -92,22 +96,26 @@ for epoch in range(epochs):
         timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)  # Example timesteps
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)  # Ensure dtype is float16
 
-        # Use gradient checkpointing for the forward pass with explicit use_reentrant
-        def custom_forward(*inputs):
-            return unet_model(*inputs)
+        # Use autocast for mixed precision
+        with autocast():
+            # Use gradient checkpointing for the forward pass with explicit use_reentrant
+            def custom_forward(*inputs):
+                return unet_model(*inputs)
 
-        outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
-        
-        # Extract the tensor from the UNet2DConditionOutput
-        output_tensor = outputs.sample  # Assuming 'sample' is the attribute containing the tensor
+            outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
+            
+            # Extract the tensor from the UNet2DConditionOutput
+            output_tensor = outputs.sample  # Assuming 'sample' is the attribute containing the tensor
 
-        # Compute loss (replace with actual target)
-        target = torch.rand_like(output_tensor)  # Placeholder target, replace with actual target
-        loss = criterion(output_tensor, target)
+            # Compute loss (replace with actual target)
+            target = torch.rand_like(output_tensor)  # Placeholder target, replace with actual target
+            loss = criterion(output_tensor, target)
         
+        # Scale the loss and backpropagate
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
         optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
         total_loss += loss.item()
 
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {total_loss / len(dataloader)}")
