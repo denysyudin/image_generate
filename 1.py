@@ -102,6 +102,9 @@ for epoch in range(epochs):
         # Placeholder for text_embeds
         text_embeds = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
 
+        # Ensure time_embeds has the same number of dimensions as text_embeds
+        time_embeds = time_ids.unsqueeze(-1).expand(-1, text_embeds.size(1), text_embeds.size(2))
+
         with autocast(device_type='cuda'):
             def custom_forward(*inputs, **kwargs):
                 # Ensure added_cond_kwargs is passed
