@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from torch.amp import autocast, GradScaler
+import torchvision.models as models
+from transformers import BertModel, BertTokenizer
 
 load_dotenv()
 
@@ -88,6 +90,44 @@ scaler = GradScaler()
 epochs = 3
 criterion = nn.MSELoss()  # Example loss function, replace with appropriate one
 accumulation_steps = 10  # Example accumulation steps, replace with appropriate value
+
+class MultiModalModel(nn.Module):
+    def __init__(self):
+        super(MultiModalModel, self).__init__()
+        # Image Encoder
+        self.cnn = models.resnet50(pretrained=True)
+        self.cnn.fc = nn.Identity()  # Remove the final classification layer
+        
+        # Text Encoder
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+        
+        # Fusion Layer
+        self.fc = nn.Linear(self.cnn.fc.in_features + self.bert.config.hidden_size, 256)
+        
+        # Output Layer
+        self.output = nn.Linear(256, num_classes)  # Adjust num_classes as needed
+
+    def forward(self, image, text_input_ids, text_attention_mask):
+        # Image features
+        image_features = self.cnn(image)
+        
+        # Text features
+        text_outputs = self.bert(input_ids=text_input_ids, attention_mask=text_attention_mask)
+        text_features = text_outputs.pooler_output
+        
+        # Concatenate features
+        combined_features = torch.cat((image_features, text_features), dim=1)
+        
+        # Pass through fusion and output layers
+        x = self.fc(combined_features)
+        x = self.output(x)
+        return x
+
+# Example usage
+# model = MultiModalModel()
+# image_tensor = ...  # Preprocessed image tensor
+# text_input_ids, text_attention_mask = ...  # Tokenized text input
+# output = model(image_tensor, text_input_ids, text_attention_mask)
 
 for epoch in range(epochs):
     total_loss = 0
