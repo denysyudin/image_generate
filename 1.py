@@ -117,6 +117,10 @@ for epoch in range(epochs):
                 # First, ensure time_ids is 2D by adding a dimension
                 time_ids = time_ids.unsqueeze(-1)  # Make it 2D if it's 1D
 
+                # Check if time_ids needs to be repeated to match the size of text_embeds
+                if time_ids.size(1) != text_embeds.size(1):
+                    time_ids = time_ids.repeat(1, text_embeds.size(1) // time_ids.size(1), 1)
+
                 # Now expand time_ids to match the dimensions of text_embeds
                 time_embeds = time_ids.expand(-1, text_embeds.size(1), -1)
 
