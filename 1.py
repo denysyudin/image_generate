@@ -16,8 +16,6 @@ from dotenv import load_dotenv
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from torch.amp import autocast, GradScaler
-import torchvision.models as models
-from transformers import BertModel, BertTokenizer
 
 load_dotenv()
 
