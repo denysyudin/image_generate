@@ -97,10 +97,11 @@ for epoch in range(epochs):
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
 
         with autocast(device_type='cuda'):
-            def custom_forward(*inputs):
-                return unet_model(*inputs)
+            def custom_forward(*inputs, **kwargs):
+                # Ensure added_cond_kwargs is passed
+                return unet_model(*inputs, added_cond_kwargs=kwargs)
 
-            outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
+            outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False, text_embeds=None)
             output_tensor = outputs.sample
             target = torch.rand_like(output_tensor)
             loss = criterion(output_tensor, target) / accumulation_steps
