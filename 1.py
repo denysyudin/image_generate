@@ -13,9 +13,6 @@ import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from torch.amp import autocast, GradScaler
 
-
-print(torch.cuda.is_available())
-
 load_dotenv()
 
 # Authenticate with Hugging Face
@@ -26,6 +23,7 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 # Dataset class
 class CustomDataset(Dataset):
     def __init__(self, images_dir, captions_file, transform=None):
+        print(torch.cuda.is_available())
         self.images_dir = images_dir
         self.transform = transform
         with open(captions_file, 'r') as file:
