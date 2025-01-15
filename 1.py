@@ -113,6 +113,8 @@ for epoch in range(epochs):
         with autocast(device_type='cuda', dtype=torch.float16):
             # custom_forward now only deals with tensors
             def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
+                # Expand time_ids to have the same number of dimensions as text_embeds
+                time_ids = time_ids.unsqueeze(-1)  # Add a dimension at the end
                 # Ensure added_cond_kwargs is passed correctly
                 added_cond_kwargs = {'text_embeds': text_embeds, 'time_ids': time_ids}
                 return unet_model(images, timesteps, encoder_hidden_states, added_cond_kwargs=added_cond_kwargs).sample
