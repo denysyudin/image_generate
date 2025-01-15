@@ -113,11 +113,12 @@ for epoch in range(epochs):
         with autocast(device_type='cuda', dtype=torch.float16):
             # custom_forward now only deals with tensors
             def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
-                # Assuming time_ids is a 1D tensor, we need to expand it to match text_embeds
-                time_embeds = time_ids.unsqueeze(1).expand(-1, text_embeds.size(1))
-                # Now, ensure both tensors have the same number of dimensions
-                time_embeds = time_embeds.unsqueeze(-1)  # Add a dimension to make it 3D
-                text_embeds = text_embeds.unsqueeze(-1) if text_embeds.dim() == 2 else text_embeds
+                # Ensure time_ids is expanded to match the dimensions of text_embeds
+                # First, ensure time_ids is 2D by adding a dimension
+                time_ids = time_ids.unsqueeze(-1)  # Make it 2D if it's 1D
+
+                # Now expand time_ids to match the dimensions of text_embeds
+                time_embeds = time_ids.expand(-1, text_embeds.size(1), -1)
 
                 # Ensure added_cond_kwargs is passed correctly
                 added_cond_kwargs = {'text_embeds': text_embeds, 'time_ids': time_embeds}
