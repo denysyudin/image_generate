@@ -51,7 +51,7 @@ dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
 # Load model
 torch.cuda.empty_cache()
-stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", torch_dtype=torch.float16)
+stable_diffusion = DiffusionPipeline.from_pretrained("stable-diffusion-v1-5/stable-diffusion-v1-5", torch_dtype=torch.float16)
 stable_diffusion = stable_diffusion.to("cuda")
 
 # Optimizer
@@ -76,7 +76,7 @@ model_save_path = './trained_pebble_diffusion_3.5_model'
 torch.save(stable_diffusion.state_dict(), model_save_path)
 
 # Load trained model for inference
-trained_model = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
+trained_model = DiffusionPipeline.from_pretrained("stable-diffusion-v1-5/stable-diffusion-v1-5")
 trained_model.load_state_dict(torch.load(model_save_path))
 trained_model.eval().to("cuda")
 
