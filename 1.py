@@ -129,7 +129,7 @@ for epoch in range(epochs):
 
                 # Ensure both tensors are 3D
                 if text_embeds.dim() == 2:
-                    text_embeds = text_embeds.unsqueeze(-1)
+                    text_embeds = text_embeds.unsqueeze(2)
 
                 # Now expand time_ids to match the dimensions of text_embeds
                 time_embeds = time_ids.expand(-1, text_embeds.size(1), text_embeds.size(2))
