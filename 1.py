@@ -99,6 +99,9 @@ for epoch in range(epochs):
         # Generate time_ids based on your specific requirements
         time_ids = torch.randint(0, 1000, (images.size(0),), device=images.device)
 
+        # Placeholder for text_embeds
+        text_embeds = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
+
         with autocast(device_type='cuda'):
             def custom_forward(*inputs, **kwargs):
                 # Ensure added_cond_kwargs is passed
@@ -110,8 +113,8 @@ for epoch in range(epochs):
                 timesteps, 
                 encoder_hidden_states, 
                 use_reentrant=False, 
-                text_embeds=None, 
-                time_ids=time_ids  # Pass time_ids here
+                text_embeds=text_embeds,  # Pass the placeholder text_embeds here
+                time_ids=time_ids
             )
             output_tensor = outputs.sample
             target = torch.rand_like(output_tensor)
