@@ -81,7 +81,7 @@ for epoch in range(epochs):
         
         # Example: Generate random timesteps and encoder hidden states
         timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)  # Example timesteps
-        encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device)  # Example encoder hidden states
+        encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)  # Ensure dtype is float16
 
         # Forward pass with required arguments
         outputs = unet_model(images, timesteps, encoder_hidden_states)
