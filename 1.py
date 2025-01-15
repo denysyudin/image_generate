@@ -59,7 +59,7 @@ transform = transforms.Compose([
 
 # DataLoader
 dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data/captions/pebble.txt', transform=transform)
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 # Load model
 torch.cuda.empty_cache()
@@ -81,6 +81,9 @@ for epoch in range(epochs):
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
         images = images.to('cuda', dtype=torch.float16)
         
+        # Clear cache before each batch
+        torch.cuda.empty_cache()
+
         # Example: Generate random timesteps and encoder hidden states
         timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)  # Example timesteps
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)  # Ensure dtype is float16
