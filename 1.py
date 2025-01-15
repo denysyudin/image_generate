@@ -47,10 +47,10 @@ transform = transforms.Compose([
 
 # DataLoader
 dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data/captions/pebble.txt', transform=transform)
-dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
 # Load model
-stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
+stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", torch_dtype=torch.float16)
 stable_diffusion = stable_diffusion.to("cuda")
 
 # Optimizer
