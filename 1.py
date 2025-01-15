@@ -104,11 +104,18 @@ for epoch in range(epochs):
         # Placeholder for encoder_hidden_states
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
 
-        # Generate time_ids 
-        time_ids = torch.randint(0, 1000, (images.size(0), 6), device=images.device, dtype=torch.float16)
+        # Change the time_ids generation
+        time_ids = torch.zeros((images.size(0), 6), device=images.device, dtype=torch.float16)
+        # Add specific values for time_ids based on SDXL's requirements
+        time_ids[:, 0] = 0  # original_size_h
+        time_ids[:, 1] = 0  # original_size_w
+        time_ids[:, 2] = 0  # target_size_h
+        time_ids[:, 3] = 0  # target_size_w
+        time_ids[:, 4] = 1000  # crop_coord_top
+        time_ids[:, 5] = 1000  # crop_coord_left
 
-        # Placeholder for text_embeds
-        text_embeds = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
+        # Placeholder for text_embeds (keep dimensions consistent)
+        text_embeds = torch.zeros((images.size(0), 77, 1280), device=images.device, dtype=torch.float16)
 
         with autocast(device_type='cuda', dtype=torch.float16):
             # custom_forward now only deals with tensors
