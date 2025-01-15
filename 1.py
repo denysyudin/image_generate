@@ -40,11 +40,19 @@ class CustomDataset(Dataset):
             image = self.transform(image)
         return image, caption
 
+# Custom transform to add an extra channel
+class AddChannel:
+    def __call__(self, image):
+        # Add an extra channel (e.g., all zeros)
+        extra_channel = torch.zeros((1, image.size(1), image.size(2)))
+        return torch.cat((image, extra_channel), dim=0)
+
 # Image transformations
 transform = transforms.Compose([
     transforms.Resize((512, 512)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    AddChannel(),  # Add the extra channel here
+    transforms.Normalize(mean=[0.5, 0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5, 0.5]),
 ])
 
 # DataLoader
