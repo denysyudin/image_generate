@@ -8,6 +8,7 @@ import torch
 from tqdm import tqdm
 from huggingface_hub import login
 from dotenv import load_dotenv
+from torch.optim import AdamW
 
 load_dotenv()
 
@@ -54,8 +55,11 @@ torch.cuda.empty_cache()
 stable_diffusion = DiffusionPipeline.from_pretrained("stable-diffusion-v1-5/stable-diffusion-v1-5", torch_dtype=torch.float16)
 stable_diffusion = stable_diffusion.to("cuda")
 
-# Optimizer
-optimizer = AdamW(stable_diffusion.parameters(), lr=1e-6)
+# Assuming 'stable_diffusion' is your pipeline object
+unet_model = stable_diffusion.unet  # Access the UNet model within the pipeline
+
+# Create an optimizer for the UNet model
+optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 
 # Training loop
 epochs = 3
