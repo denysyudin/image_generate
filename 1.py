@@ -71,8 +71,12 @@ for epoch in range(epochs):
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
         images = images.to('cuda', dtype=torch.float16)
         
-        # Forward pass (replace with actual model forward pass)
-        outputs = unet_model(images)  # Example, replace with actual model call
+        # Example: Generate random timesteps and encoder hidden states
+        timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)  # Example timesteps
+        encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device)  # Example encoder hidden states
+
+        # Forward pass with required arguments
+        outputs = unet_model(images, timesteps, encoder_hidden_states)
         
         # Compute loss (replace with actual target)
         target = torch.rand_like(outputs)  # Placeholder target, replace with actual target
