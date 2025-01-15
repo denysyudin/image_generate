@@ -105,7 +105,7 @@ for epoch in range(epochs):
         # Ensure time_embeds has the same number of dimensions as text_embeds
         time_embeds = time_ids.unsqueeze(1).unsqueeze(2).expand(-1, text_embeds.size(1), text_embeds.size(2))
 
-        with autocast(dtype=torch.float16):
+        with autocast(device_type='cuda', dtype=torch.float16):
             def custom_forward(*inputs, **kwargs):
                 # Ensure added_cond_kwargs is passed
                 return unet_model(*inputs, added_cond_kwargs=kwargs)
