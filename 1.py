@@ -16,6 +16,8 @@ load_dotenv()
 # Authenticate with Hugging Face
 login(token=os.getenv("TOKEN"))
 
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
 # Dataset class
 class CustomDataset(Dataset):
     def __init__(self, images_dir, captions_file, transform=None):
