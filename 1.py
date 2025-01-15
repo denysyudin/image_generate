@@ -81,46 +81,43 @@ scaler = GradScaler(device='cuda')
 # Training loop
 epochs = 3
 criterion = nn.MSELoss()  # Example loss function, replace with appropriate one
+accumulation_steps = 10  # Example accumulation steps, replace with appropriate value
 
 for epoch in range(epochs):
     total_loss = 0
+    optimizer.zero_grad()  # Move zero_grad outside the loop
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
         images = images.to('cuda', dtype=torch.float16)
-        
-        # Ensure images require gradients
         images.requires_grad_(True)
-        
+
         # Clear cache before each batch
         torch.cuda.empty_cache()
 
-        # Example: Generate random timesteps and encoder hidden states
-        timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)  # Example timesteps
-        encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)  # Ensure dtype is float16
+        timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
+        encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
 
-        # Use autocast for mixed precision
         with autocast(device_type='cuda'):
-            # Use gradient checkpointing for the forward pass
             def custom_forward(*inputs):
                 return unet_model(*inputs)
 
-            # Specify use_reentrant=False as recommended
             outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
-            
-            # Extract the tensor from the UNet2DConditionOutput
-            output_tensor = outputs.sample  # Assuming 'sample' is the attribute containing the tensor
+            output_tensor = outputs.sample
+            target = torch.rand_like(output_tensor)
+            loss = criterion(output_tensor, target) / accumulation_steps
 
-            # Compute loss (replace with actual target)
-            target = torch.rand_like(output_tensor)  # Placeholder target, replace with actual target
-            loss = criterion(output_tensor, target)
-        
-        # Scale the loss and backpropagate
         scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-        optimizer.zero_grad()
-        total_loss += loss.item()
+
+        if (batch_idx + 1) % accumulation_steps == 0:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+
+        total_loss += loss.item() * accumulation_steps
 
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {total_loss / len(dataloader)}")
+
+    # Clear cache after each epoch
+    torch.cuda.empty_cache()
 
 # Save the trained model
 model_save_path = './trained_pebble_diffusion_3.5_model'
