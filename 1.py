@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from torch.optim import AdamW
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 
 load_dotenv()
 
@@ -75,7 +75,7 @@ unet_model = stable_diffusion.unet  # Access the UNet model within the pipeline
 optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 
 # Initialize GradScaler for mixed precision
-scaler = GradScaler()
+scaler = GradScaler(device='cuda')
 
 # Training loop
 epochs = 3
@@ -97,7 +97,7 @@ for epoch in range(epochs):
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)  # Ensure dtype is float16
 
         # Use autocast for mixed precision
-        with autocast():
+        with autocast(device_type='cuda'):
             # Use gradient checkpointing for the forward pass with explicit use_reentrant
             def custom_forward(*inputs):
                 return unet_model(*inputs)
