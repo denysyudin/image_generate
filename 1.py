@@ -50,6 +50,7 @@ dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data
 dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
 # Load model
+torch.cuda.empty_cache()
 stable_diffusion = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", torch_dtype=torch.float16)
 stable_diffusion = stable_diffusion.to("cuda")
 
