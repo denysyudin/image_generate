@@ -82,6 +82,9 @@ for epoch in range(epochs):
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
         images = images.to('cuda', dtype=torch.float16)
         
+        # Ensure images require gradients
+        images.requires_grad_(True)
+        
         # Clear cache before each batch
         torch.cuda.empty_cache()
 
@@ -89,11 +92,11 @@ for epoch in range(epochs):
         timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)  # Example timesteps
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)  # Ensure dtype is float16
 
-        # Use gradient checkpointing for the forward pass
+        # Use gradient checkpointing for the forward pass with explicit use_reentrant
         def custom_forward(*inputs):
             return unet_model(*inputs)
 
-        outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states)
+        outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
         
         # Compute loss (replace with actual target)
         target = torch.rand_like(outputs)  # Placeholder target, replace with actual target
