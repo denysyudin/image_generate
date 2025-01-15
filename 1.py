@@ -62,7 +62,7 @@ transform = transforms.Compose([
 
 # DataLoader
 dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data/captions/pebble.txt', transform=transform)
-dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 # Load model
 torch.cuda.empty_cache()
@@ -103,7 +103,8 @@ for epoch in range(epochs):
             def custom_forward(*inputs):
                 return unet_model(*inputs)
 
-            outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states)
+            # Specify use_reentrant=False as recommended
+            outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
             
             # Extract the tensor from the UNet2DConditionOutput
             output_tensor = outputs.sample  # Assuming 'sample' is the attribute containing the tensor
