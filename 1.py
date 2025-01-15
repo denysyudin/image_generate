@@ -13,6 +13,9 @@ import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from torch.amp import autocast, GradScaler
 
+
+print(torch.cuda.is_available())
+
 load_dotenv()
 
 # Authenticate with Hugging Face
