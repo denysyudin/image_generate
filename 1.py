@@ -98,11 +98,11 @@ for epoch in range(epochs):
 
         # Use autocast for mixed precision
         with autocast(device_type='cuda'):
-            # Use gradient checkpointing for the forward pass with explicit use_reentrant
+            # Use gradient checkpointing for the forward pass
             def custom_forward(*inputs):
                 return unet_model(*inputs)
 
-            outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states, use_reentrant=False)
+            outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states)
             
             # Extract the tensor from the UNet2DConditionOutput
             output_tensor = outputs.sample  # Assuming 'sample' is the attribute containing the tensor
@@ -122,11 +122,10 @@ for epoch in range(epochs):
 
 # Save the trained model
 model_save_path = './trained_pebble_diffusion_3.5_model'
-torch.save(stable_diffusion.state_dict(), model_save_path)
+stable_diffusion.save_pretrained(model_save_path)
 
 # Load trained model for inference
-trained_model = DiffusionPipeline.from_pretrained("stable-diffusion-v1-5/stable-diffusion-v1-5")
-trained_model.load_state_dict(torch.load(model_save_path))
+trained_model = DiffusionPipeline.from_pretrained(model_save_path)
 trained_model.eval().to("cuda")
 
 # Generate an image based on a prompt
