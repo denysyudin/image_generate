@@ -54,7 +54,7 @@ class AddChannel:
 
 # Image transformations
 transform = transforms.Compose([
-    transforms.Resize((512, 512)),
+    transforms.Resize((256, 256)),
     transforms.ToTensor(),
     AddChannel(),  # Add the extra channel here
     transforms.Normalize(mean=[0.5, 0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5, 0.5]),
@@ -129,7 +129,8 @@ trained_model.eval().to("cuda")
 
 # Generate an image based on a prompt
 def generate_image(prompt):
-    generated_image = trained_model(prompt).images[0]
-    generated_image.show()
+    with torch.no_grad():  # Disable gradient calculation
+        generated_image = trained_model(prompt).images[0]
+        generated_image.show()
 
 generate_image("Pebble the rabbit sitting in a field of flowers, smiling")
