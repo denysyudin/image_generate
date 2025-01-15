@@ -10,6 +10,7 @@ from huggingface_hub import login
 from dotenv import load_dotenv
 from torch.optim import AdamW
 import torch.nn as nn
+import torch.utils.checkpoint as checkpoint
 
 load_dotenv()
 
@@ -88,8 +89,11 @@ for epoch in range(epochs):
         timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)  # Example timesteps
         encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)  # Ensure dtype is float16
 
-        # Forward pass with required arguments
-        outputs = unet_model(images, timesteps, encoder_hidden_states)
+        # Use gradient checkpointing for the forward pass
+        def custom_forward(*inputs):
+            return unet_model(*inputs)
+
+        outputs = checkpoint.checkpoint(custom_forward, images, timesteps, encoder_hidden_states)
         
         # Compute loss (replace with actual target)
         target = torch.rand_like(outputs)  # Placeholder target, replace with actual target
