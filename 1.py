@@ -104,10 +104,13 @@ optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 # Enable gradient checkpointing
 unet_model.enable_gradient_checkpointing()
 
+# Before training, enable memory efficient attention
+unet_model.set_attention_slice(1)
+
 # Training loop
 epochs = 3
 criterion = nn.MSELoss()  # Example loss function, replace with appropriate one
-accumulation_steps = 10  # Example accumulation steps, replace with appropriate value
+accumulation_steps = 32  # Increase this value
 
 class MultiModalModel(nn.Module):
     def __init__(self, num_classes=1000):  # Add default num_classes parameter
@@ -170,16 +173,13 @@ for epoch in range(epochs):
                 # Generate timesteps
                 timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
                 
-                # Create encoder hidden states with gradients (reduce size if possible)
+                # Create encoder hidden states with gradients
                 encoder_hidden_states = torch.rand(
                     (images.size(0), 77, 2048), 
                     device=images.device, 
                     dtype=torch.float16,
                     requires_grad=True
                 )
-                
-                # Free memory
-                torch.cuda.empty_cache()
                 
                 # Generate time_ids and text_embeds with gradients
                 time_ids = torch.zeros(
@@ -196,32 +196,18 @@ for epoch in range(epochs):
                     requires_grad=True
                 )
                 
-                # Forward pass through UNet with memory-efficient settings
-                def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
-                    added_cond_kwargs = {
-                        'text_embeds': text_embeds,
-                        'time_ids': time_ids
-                    }
-                    return unet_model(
-                        images, 
-                        timesteps, 
-                        encoder_hidden_states, 
-                        added_cond_kwargs=added_cond_kwargs
-                    ).sample
-
-                # Clear cache before checkpoint
-                torch.cuda.empty_cache()
+                # Direct forward pass without checkpoint
+                added_cond_kwargs = {
+                    'text_embeds': text_embeds,
+                    'time_ids': time_ids
+                }
                 
-                # Use gradient checkpointing with memory efficient settings
-                output = checkpoint.checkpoint(
-                    custom_forward,
-                    images,
-                    timesteps,
-                    encoder_hidden_states,
-                    text_embeds,
-                    time_ids,
-                    use_reentrant=False
-                )
+                output = unet_model(
+                    images, 
+                    timesteps, 
+                    encoder_hidden_states, 
+                    added_cond_kwargs=added_cond_kwargs
+                ).sample
                 
                 # Calculate loss (ensure target has gradients too)
                 target = torch.rand_like(output, requires_grad=True)
