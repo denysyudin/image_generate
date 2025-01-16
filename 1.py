@@ -16,6 +16,9 @@ from dotenv import load_dotenv
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from torch.amp import autocast, GradScaler
+from transformers import BertModel
+from torchvision import models
+import torch.nn.functional as F
 
 load_dotenv()
 
@@ -84,13 +87,16 @@ optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 # Initialize GradScaler for mixed precision
 scaler = GradScaler()
 
+# Before the training loop, add gradient checkpointing to save memory
+unet_model.enable_gradient_checkpointing()
+
 # Training loop
 epochs = 3
 criterion = nn.MSELoss()  # Example loss function, replace with appropriate one
 accumulation_steps = 10  # Example accumulation steps, replace with appropriate value
 
 class MultiModalModel(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes=1000):  # Add default num_classes parameter
         super(MultiModalModel, self).__init__()
         # Image Encoder
         self.cnn = models.resnet50(pretrained=True)
@@ -103,7 +109,7 @@ class MultiModalModel(nn.Module):
         self.fc = nn.Linear(self.cnn.fc.in_features + self.bert.config.hidden_size, 256)
         
         # Output Layer
-        self.output = nn.Linear(256, num_classes)  # Adjust num_classes as needed
+        self.output = nn.Linear(256, num_classes)
 
     def forward(self, image, text_input_ids, text_attention_mask):
         # Image features
@@ -118,6 +124,7 @@ class MultiModalModel(nn.Module):
         
         # Pass through fusion and output layers
         x = self.fc(combined_features)
+        x = F.relu(x)  # Add activation function
         x = self.output(x)
         return x
 
@@ -127,79 +134,75 @@ class MultiModalModel(nn.Module):
 # text_input_ids, text_attention_mask = ...  # Tokenized text input
 # output = model(image_tensor, text_input_ids, text_attention_mask)
 
+# Add near the top of your script
+torch.backends.cudnn.benchmark = True
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 for epoch in range(epochs):
     total_loss = 0
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
-        optimizer.zero_grad()  # Move zero_grad here for gradient accumulation
-        images = images.to('cuda', dtype=torch.float16)
-        images.requires_grad_(True)
-
-        # Clear cache before each batch
-        torch.cuda.empty_cache()
-
-        timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
+        # Move to CPU periodically to clear GPU memory
+        if batch_idx % 10 == 0:
+            torch.cuda.empty_cache()
+            
+        optimizer.zero_grad()
         
-        # Placeholder for encoder_hidden_states
-        encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
+        try:
+            images = images.to('cuda', dtype=torch.float16)
+            images.requires_grad_(True)
 
-        # Generate time_ids 
-        time_ids = torch.randint(0, 1000, (images.size(0), 6), device=images.device, dtype=torch.float16)
+            with autocast(device_type='cuda', dtype=torch.float16):
+                # Generate timesteps
+                timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
+                
+                # Create encoder hidden states
+                encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
+                
+                # Generate time_ids and text_embeds
+                time_ids = torch.randint(0, 1000, (images.size(0), 6), device=images.device, dtype=torch.float16)
+                text_embeds = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
+                
+                # Forward pass through UNet
+                def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
+                    time_ids = time_ids.unsqueeze(-1)
+                    time_embeds = time_ids.expand(-1, text_embeds.size(1), -1)
+                    added_cond_kwargs = {'text_embeds': text_embeds, 'time_ids': time_embeds}
+                    return unet_model(images, timesteps, encoder_hidden_states, added_cond_kwargs=added_cond_kwargs).sample
 
-        # Placeholder for text_embeds
-        text_embeds = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
-
-        with autocast(device_type='cuda', dtype=torch.float16):
-            # custom_forward now only deals with tensors
-            def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
-                # Ensure time_ids is expanded to match the dimensions of text_embeds
-                # First, ensure time_ids is 2D by adding a dimension
-                time_ids = time_ids.unsqueeze(-1)  # Make it 2D if it's 1D
-
-                # Adjust time_ids to match the size of text_embeds
-                if time_ids.size(1) != text_embeds.size(1):
-                    # Calculate the number of repeats needed
-                    repeat_factor = text_embeds.size(1) // time_ids.size(1)
-                    remainder = text_embeds.size(1) % time_ids.size(1)
-                    
-                    # Repeat and pad time_ids to match text_embeds size
-                    time_ids = time_ids.repeat(1, repeat_factor + (1 if remainder > 0 else 0), 1)
-                    time_ids = time_ids[:, :text_embeds.size(1), :]  # Trim to match exactly
-
-                # Ensure both tensors are 3D
-                if text_embeds.dim() == 2:
-                    text_embeds = text_embeds.unsqueeze(2)
-
-                # Now expand time_ids to match the dimensions of text_embeds
-                time_embeds = time_ids.expand(-1, text_embeds.size(1), text_embeds.size(2))
-
-                # Ensure added_cond_kwargs is passed correctly
-                added_cond_kwargs = {'text_embeds': text_embeds, 'time_ids': time_embeds}
-                return unet_model(images, timesteps, encoder_hidden_states, added_cond_kwargs=added_cond_kwargs).sample
-
-            output_tensor = checkpoint.checkpoint(
-                custom_forward,
-                images,
-                timesteps,
-                encoder_hidden_states,
-                text_embeds,  # Pass the placeholder text_embeds here
-                time_ids
-            )
-
-            target = torch.rand_like(output_tensor)
-            loss = criterion(output_tensor, target) / accumulation_steps
-
-        scaler.scale(loss).backward()
-
-        if (batch_idx + 1) % accumulation_steps == 0:
-            scaler.step(optimizer)
-            scaler.update()
-            # optimizer.zero_grad() # Removed zero_grad here
+                # Use gradient checkpointing
+                output = checkpoint.checkpoint(
+                    custom_forward,
+                    images,
+                    timesteps,
+                    encoder_hidden_states,
+                    text_embeds,
+                    time_ids
+                )
+                
+                # Calculate loss
+                target = torch.rand_like(output)  # Replace with actual target
+                loss = criterion(output, target) / accumulation_steps
+                
+            # Backward pass with gradient scaling
+            scaler.scale(loss).backward()
+            
+            if (batch_idx + 1) % accumulation_steps == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                print('| WARNING: ran out of memory, skipping batch')
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                continue
+            else:
+                raise e
 
         total_loss += loss.item() * accumulation_steps
 
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {total_loss / len(dataloader)}")
-
-    # Clear cache after each epoch
     torch.cuda.empty_cache()
 
 # Save the trained model
@@ -211,9 +214,18 @@ trained_model = DiffusionPipeline.from_pretrained(model_save_path)
 trained_model.eval().to("cuda")
 
 # Generate an image based on a prompt
-def generate_image(prompt):
-    with torch.no_grad():  # Disable gradient calculation
-        generated_image = trained_model(prompt=prompt).images[0]
-        generated_image.show()
+def generate_image(prompt, num_inference_steps=50):
+    try:
+        with torch.no_grad():
+            generated_image = trained_model(
+                prompt=prompt,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=7.5
+            ).images[0]
+            generated_image.save(f"generated_{prompt[:30]}.png")
+            return generated_image
+    except Exception as e:
+        print(f"Error generating image: {str(e)}")
+        return None
 
 generate_image("Pebble the rabbit sitting in a field of flowers, smiling")
