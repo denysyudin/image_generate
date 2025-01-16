@@ -156,18 +156,21 @@ for epoch in range(epochs):
                 # Generate timesteps
                 timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
                 
-                # Create encoder hidden states
+                # Create encoder hidden states (77 is the default sequence length for SDXL)
                 encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
                 
-                # Generate time_ids and text_embeds
-                time_ids = torch.randint(0, 1000, (images.size(0), 6), device=images.device, dtype=torch.float16)
-                text_embeds = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
+                # Generate time_ids (SDXL expects 6 time embeddings)
+                time_ids = torch.zeros((images.size(0), 6), device=images.device, dtype=torch.float16)
+                
+                # Generate text_embeds (should match encoder hidden states sequence length)
+                text_embeds = torch.rand((images.size(0), 1280), device=images.device, dtype=torch.float16)
                 
                 # Forward pass through UNet
                 def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
-                    time_ids = time_ids.unsqueeze(-1)
-                    time_embeds = time_ids.expand(-1, text_embeds.size(1), -1)
-                    added_cond_kwargs = {'text_embeds': text_embeds, 'time_ids': time_embeds}
+                    added_cond_kwargs = {
+                        'text_embeds': text_embeds,  # [batch_size, 1280]
+                        'time_ids': time_ids        # [batch_size, 6]
+                    }
                     return unet_model(images, timesteps, encoder_hidden_states, added_cond_kwargs=added_cond_kwargs).sample
 
                 # Use gradient checkpointing
