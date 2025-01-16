@@ -63,7 +63,7 @@ class AddChannel:
 
 # Image transformations
 transform = transforms.Compose([
-    transforms.Resize((256, 256)),
+    transforms.Resize((512, 512)),
     transforms.ToTensor(),  # Convert to tensor first
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
     AddChannel(),  # Add the extra channel after ToTensor
@@ -89,6 +89,10 @@ scaler = GradScaler()
 
 # Before the training loop, add gradient checkpointing to save memory
 unet_model.enable_gradient_checkpointing()
+
+# Before the training loop, modify the model and optimizer setup:
+unet_model = unet_model.float()  # Ensure model parameters are in float32
+optimizer = AdamW(unet_model.parameters(), lr=1e-6)
 
 # Training loop
 epochs = 3
@@ -142,16 +146,15 @@ torch.backends.cudnn.allow_tf32 = True
 for epoch in range(epochs):
     total_loss = 0
     for batch_idx, (images, captions) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f"Epoch {epoch+1}/{epochs}"):
-        # Move to CPU periodically to clear GPU memory
         if batch_idx % 10 == 0:
             torch.cuda.empty_cache()
             
         optimizer.zero_grad()
         
         try:
-            images = images.to('cuda', dtype=torch.float16)
-            images.requires_grad_(True)
-
+            # Convert images to float32 first, then move to GPU
+            images = images.float().to('cuda')
+            
             with autocast(device_type='cuda', dtype=torch.float16):
                 # Generate timesteps
                 timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
@@ -191,6 +194,13 @@ for epoch in range(epochs):
             scaler.scale(loss).backward()
             
             if (batch_idx + 1) % accumulation_steps == 0:
+                # Unscale gradients
+                scaler.unscale_(optimizer)
+                
+                # Clip gradients
+                torch.nn.utils.clip_grad_norm_(unet_model.parameters(), max_norm=1.0)
+                
+                # Optimizer step
                 scaler.step(optimizer)
                 scaler.update()
                 
