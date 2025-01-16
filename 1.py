@@ -91,8 +91,12 @@ scaler = GradScaler()
 unet_model.enable_gradient_checkpointing()
 
 # Before the training loop, modify the model and optimizer setup:
+unet_model.train()  # Set model to training mode
 unet_model = unet_model.float()  # Ensure model parameters are in float32
 optimizer = AdamW(unet_model.parameters(), lr=1e-6)
+
+# Enable gradient checkpointing
+unet_model.enable_gradient_checkpointing()
 
 # Training loop
 epochs = 3
@@ -152,42 +156,58 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         
         try:
-            # Convert images to float32 first, then move to GPU
+            # Convert images to float32 and enable gradients
             images = images.float().to('cuda')
+            images.requires_grad_(True)
             
             with autocast(device_type='cuda', dtype=torch.float16):
                 # Generate timesteps
                 timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
                 
-                # Create encoder hidden states with correct dimensions for SDXL
-                encoder_hidden_states = torch.rand((images.size(0), 77, 2048), device=images.device, dtype=torch.float16)
+                # Create encoder hidden states with gradients
+                encoder_hidden_states = torch.rand(
+                    (images.size(0), 77, 2048), 
+                    device=images.device, 
+                    dtype=torch.float16,
+                    requires_grad=True
+                )
                 
-                # Generate time_ids (SDXL expects 6 time embeddings)
-                time_ids = torch.zeros((images.size(0), 6), device=images.device, dtype=torch.float16)
+                # Generate time_ids and text_embeds with gradients
+                time_ids = torch.zeros(
+                    (images.size(0), 6), 
+                    device=images.device, 
+                    dtype=torch.float16,
+                    requires_grad=True
+                )
                 
-                # Generate text_embeds (correct dimension for SDXL)
-                text_embeds = torch.rand((images.size(0), 1280), device=images.device, dtype=torch.float16)
+                text_embeds = torch.rand(
+                    (images.size(0), 1280), 
+                    device=images.device, 
+                    dtype=torch.float16,
+                    requires_grad=True
+                )
                 
                 # Forward pass through UNet
                 def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
                     added_cond_kwargs = {
-                        'text_embeds': text_embeds,  # [batch_size, 1280]
-                        'time_ids': time_ids        # [batch_size, 6]
+                        'text_embeds': text_embeds,
+                        'time_ids': time_ids
                     }
                     return unet_model(images, timesteps, encoder_hidden_states, added_cond_kwargs=added_cond_kwargs).sample
 
-                # Use gradient checkpointing
+                # Use gradient checkpointing with use_reentrant=False
                 output = checkpoint.checkpoint(
                     custom_forward,
                     images,
                     timesteps,
                     encoder_hidden_states,
                     text_embeds,
-                    time_ids
+                    time_ids,
+                    use_reentrant=False
                 )
                 
-                # Calculate loss
-                target = torch.rand_like(output)  # Replace with actual target
+                # Calculate loss (ensure target has gradients too)
+                target = torch.rand_like(output, requires_grad=True)
                 loss = criterion(output, target) / accumulation_steps
                 
             # Backward pass with gradient scaling
