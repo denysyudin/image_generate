@@ -156,13 +156,13 @@ for epoch in range(epochs):
                 # Generate timesteps
                 timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
                 
-                # Create encoder hidden states (77 is the default sequence length for SDXL)
-                encoder_hidden_states = torch.rand((images.size(0), 77, 768), device=images.device, dtype=torch.float16)
+                # Create encoder hidden states with correct dimensions for SDXL
+                encoder_hidden_states = torch.rand((images.size(0), 77, 2048), device=images.device, dtype=torch.float16)
                 
                 # Generate time_ids (SDXL expects 6 time embeddings)
                 time_ids = torch.zeros((images.size(0), 6), device=images.device, dtype=torch.float16)
                 
-                # Generate text_embeds (should match encoder hidden states sequence length)
+                # Generate text_embeds (correct dimension for SDXL)
                 text_embeds = torch.rand((images.size(0), 1280), device=images.device, dtype=torch.float16)
                 
                 # Forward pass through UNet
