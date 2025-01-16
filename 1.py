@@ -71,7 +71,13 @@ transform = transforms.Compose([
 
 # DataLoader
 dataset = CustomDataset(images_dir='./data/images/pebble', captions_file='./data/captions/pebble.txt', transform=transform)
-dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+dataloader = DataLoader(
+    dataset, 
+    batch_size=1,  # Reduce batch size
+    shuffle=True,
+    num_workers=2,  # Add parallel data loading
+    pin_memory=True  # Speed up data transfer to GPU
+)
 
 # Load model
 torch.cuda.empty_cache()
@@ -164,13 +170,16 @@ for epoch in range(epochs):
                 # Generate timesteps
                 timesteps = torch.randint(0, 1000, (images.size(0),), device=images.device)
                 
-                # Create encoder hidden states with gradients
+                # Create encoder hidden states with gradients (reduce size if possible)
                 encoder_hidden_states = torch.rand(
                     (images.size(0), 77, 2048), 
                     device=images.device, 
                     dtype=torch.float16,
                     requires_grad=True
                 )
+                
+                # Free memory
+                torch.cuda.empty_cache()
                 
                 # Generate time_ids and text_embeds with gradients
                 time_ids = torch.zeros(
@@ -187,15 +196,23 @@ for epoch in range(epochs):
                     requires_grad=True
                 )
                 
-                # Forward pass through UNet
+                # Forward pass through UNet with memory-efficient settings
                 def custom_forward(images, timesteps, encoder_hidden_states, text_embeds, time_ids):
                     added_cond_kwargs = {
                         'text_embeds': text_embeds,
                         'time_ids': time_ids
                     }
-                    return unet_model(images, timesteps, encoder_hidden_states, added_cond_kwargs=added_cond_kwargs).sample
+                    return unet_model(
+                        images, 
+                        timesteps, 
+                        encoder_hidden_states, 
+                        added_cond_kwargs=added_cond_kwargs
+                    ).sample
 
-                # Use gradient checkpointing with use_reentrant=False
+                # Clear cache before checkpoint
+                torch.cuda.empty_cache()
+                
+                # Use gradient checkpointing with memory efficient settings
                 output = checkpoint.checkpoint(
                     custom_forward,
                     images,
@@ -209,7 +226,7 @@ for epoch in range(epochs):
                 # Calculate loss (ensure target has gradients too)
                 target = torch.rand_like(output, requires_grad=True)
                 loss = criterion(output, target) / accumulation_steps
-                
+
             # Backward pass with gradient scaling
             scaler.scale(loss).backward()
             
@@ -217,18 +234,23 @@ for epoch in range(epochs):
                 # Unscale gradients
                 scaler.unscale_(optimizer)
                 
-                # Clip gradients
-                torch.nn.utils.clip_grad_norm_(unet_model.parameters(), max_norm=1.0)
+                # Clip gradients to prevent explosion
+                torch.nn.utils.clip_grad_norm_(unet_model.parameters(), max_norm=0.5)
                 
                 # Optimizer step
                 scaler.step(optimizer)
                 scaler.update()
                 
+                # Clear gradients and cache
+                optimizer.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
+
         except RuntimeError as e:
             if "out of memory" in str(e):
                 print('| WARNING: ran out of memory, skipping batch')
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
+                    optimizer.zero_grad(set_to_none=True)
                 continue
             else:
                 raise e
