@@ -251,8 +251,16 @@ model_save_path = './trained_pebble_diffusion_3.5_model'
 stable_diffusion.save_pretrained(model_save_path)
 
 # Load trained model for inference
-trained_model = DiffusionPipeline.from_pretrained(model_save_path)
-trained_model.eval().to("cuda")
+trained_model = DiffusionPipeline.from_pretrained(
+    model_save_path,
+    torch_dtype=torch.float16
+).to("cuda")
+
+# Set the model to inference mode
+trained_model.unet.eval()
+trained_model.vae.eval()
+trained_model.text_encoder.eval()
+trained_model.text_encoder_2.eval()
 
 # Generate an image based on a prompt
 def generate_image(prompt, num_inference_steps=50):
@@ -269,4 +277,5 @@ def generate_image(prompt, num_inference_steps=50):
         print(f"Error generating image: {str(e)}")
         return None
 
+# Test the model
 generate_image("Pebble the rabbit sitting in a field of flowers, smiling")
